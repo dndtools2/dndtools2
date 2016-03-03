@@ -1,0 +1,131 @@
+{% load custom_tags %}<!DOCTYPE HTML>
+<html>
+<head>
+  <title>{% block title %}Home{% endblock %} &ndash; D&amp;D Tools</title>
+  <link href="{% static "favicon.ico" %}" rel="SHORTCUT ICON"/>
+  <meta name="description" content="Complete list of all D&amp;D spells, rulebooks, feats, classes and more!"/>
+  <meta name="keywords" content="D&amp;D, Spells, Feats, Classes"/>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+  <meta name="google-site-verification" content="REPLACE_THIS" />
+  {% block extra_meta %}{% endblock %}
+  <link rel="stylesheet" type="text/css" href="{% static "css/style.css" %}" title="style"/>
+  <link rel="stylesheet" type="text/css" href="{% static "css/chosen.css" %}" title="style"/>
+  <script type="text/javascript" src="http://code.jquery.com/jquery-2.2.1.js"></script>
+  <script type="text/javascript" src="{% static "js/chosen.jquery.min.js" "no-timestamp" %}"></script>
+  {# google search engine #}
+  {% if not debug  %}
+  <link rel="stylesheet" href="//www.google.com/cse/style/look/default.css" type="text/css" />
+  {% block extra_link %}{% endblock %}
+  <script type="text/javascript">
+
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'REPLACE_THIS']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+  {% endif %}
+</head>
+
+<body>
+<div id="fb-root"></div>
+{% comment %}<div class="flash">
+  Please check the home page, I've added some news. Thanks.
+</div>{% endcomment %}
+<div id="main">
+  <div id="header">
+        <div id="logo">
+            <div id="logo_text">
+                <h1>
+                    <a href="{% url 'dnd:index' %}">D&amp;D<span class="logo_colour">tools</span></a>{% if unread_news_count %}<span id="counter" title="{{ unread_news_count }} unread news">{{ unread_news_count }}</span>{% endif %}
+                </h1>
+
+                <h2>Feats. Spells. Prestige Classes. And more!</h2>
+            </div>
+            {# Google search engine  #}
+            {% if not debug %}
+                <div id="google-search-holder">
+                    <div id="cse-search-form" style="width: 100%">Loading</div>
+                    <script src="http://www.google.com/jsapi" type="text/javascript"></script>
+                    <script type="text/javascript">
+                        google.load('search', '1', {language: 'en'});
+                        google.setOnLoadCallback(function () {
+                            var customSearchControl = new google.search.CustomSearchControl('REPLACE_THIS');
+                            customSearchControl.setResultSetSize(google.search.Search.FILTERED_CSE_RESULTSET);
+                            var options = new google.search.DrawOptions();
+                            options.setAutoComplete(true);
+                            options.enableSearchboxOnly("http://www.google.com/cse?cx=REPLACE_THIS");
+                            customSearchControl.draw('cse-search-form', options);
+                        }, true);
+                    </script>
+                </div>
+            {% endif %}
+        </div>
+      {% include "dnd/menu.html" %}
+    </div>
+  <div id="site_content">
+    {% if display_3e_warning %}
+      <div id="warning-bar">
+          Warning: This is 3.0 Edition material. It is possible that there is more recent 3.5 Edition version.
+      </div>
+    {% endif %}
+    <div id="breadcrumbs">
+      {% block breadcrumbs %}{% endblock %}
+    </div>
+    <div class="sidebar">
+        <script type="text/javascript">
+            var resetMenuTimer;
+            $("#menu").find("li").mouseenter(function() {
+                $('#menu').find('li').removeClass('arrow');
+                $(this).addClass('arrow');
+                $('#submenubar').find('ul').hide();
+                $('#sub' + $(this).attr('id')).show();
+            });
+            var $menus = $('#menus');
+            $menus.mouseleave(function() {
+                window.clearTimeout(resetMenuTimer);
+                resetMenuTimer = window.setTimeout(resetMenu, 500);
+            });
+            $menus.mouseenter(function () {
+                window.clearTimeout(resetMenuTimer);
+            });
+            function resetMenu() {
+                var $menu = $('#menu');
+                $menu.find('li').removeClass('arrow');
+                $menu.find('li.selected').addClass('arrow');
+                var $submenubar = $('#submenubar');
+                $submenubar.find('ul').hide();
+                $submenubar.find('ul.enabled').show();
+            };
+        </script>
+      {% block sidebar %}{% endblock %}
+    </div>
+    <div id="content">
+      {% if inaccurate_url  %}
+        <div id="inaccurate"><a href="{% url 'dnd:inaccurate_content' %}?url={{ inaccurate_url|urlencode }}"><img src="{% static "images/inaccurate.png" %}" alt="Inaccurate?"/></a></div>
+      {% endif %}
+      {% if is_admin %}
+          <span class="edit">{% block admin_edit %}{% endblock %}</span>
+          <script type="text/javascript">
+            $('.edit:empty').hide();
+          </script>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+  <div id="content_footer"></div>
+  <div id="footer">
+      {% if is_mobile %}<a href="{% url 'dnd:mobile:return_to_mobile_version' %}">Return to mobile version</a>{% endif %}
+    {% comment %}Copyright &copy; colour_blue |
+    <a href="http://validator.w3.org/check?uri=referer">HTML5</a> |
+    <a href="http://jigsaw.w3.org/css-validator/check/referer">CSS</a> |
+    <a href="http://www.html5webtemplates.co.uk">design from
+      HTML5webtemplates.co.uk</a>{% endcomment %}
+  </div>
+</div>
+</body>
+</html>

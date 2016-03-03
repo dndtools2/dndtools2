@@ -1,0 +1,234 @@
+from django.shortcuts import get_object_or_404, render
+from dnd.menu import MenuItem
+from dnd.menu import menu_item, submenu_item
+from dnd.mobile.views import permanent_redirect_object_mobile
+from dnd.views import is_3e_edition, permanent_redirect_view
+from dnd.mobile.dnd_paginator import DndMobilePaginator
+from dnd.filters import SpellDomainFilter, SpellDescriptorFilter, SpellFilter
+from dnd.models import SpellDescriptor, SpellSchool, SpellSubSchool, Domain, Spell, Rule, Rulebook, DomainVariant
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.SPELLS)
+def spell_index_mobile(request):
+    f = SpellFilter(request.GET, queryset=Spell.objects.select_related(
+            'rulebook', 'rulebook__dnd_edition', 'school').distinct())
+
+    paginator = DndMobilePaginator(f.qs, request)
+
+    form_submitted = 1 if '_filter' in request.GET else 0
+
+    return render(request, 'dnd/mobile/spells/spell_index.html', context={'spell_list': paginator.items(),
+      'paginator': paginator, 'filter': f, 'form_submitted': form_submitted,},)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.DESCRIPTORS)
+def spell_descriptor_list_mobile(request):
+    f = SpellDescriptorFilter(request.GET,
+                              queryset=SpellDescriptor.objects.all())
+
+    paginator = DndMobilePaginator(f.qs, request)
+
+    form_submitted = 1 if '_filter' in request.GET else 0
+
+    return render(request, 'dnd/mobile/spells/spell_descriptor_list.html', context=
+      {'spell_descriptor_list': paginator.items(), 'paginator': paginator, 'filter': f,
+       'form_submitted': form_submitted,},)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.SCHOOLS)
+def spell_school_list_mobile(request):
+    spell_school_list = SpellSchool.objects.all()
+    spell_sub_school_list = SpellSubSchool.objects.all()
+    return render(request, 'dnd/mobile/spells/spell_school_list.html', context=
+      {'spell_school_list': spell_school_list, 'spell_sub_school_list': spell_sub_school_list,},)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.SPELLS)
+def spells_in_rulebook_mobile(request, rulebook_slug, rulebook_id):
+    rulebook = get_object_or_404(Rulebook, pk=rulebook_id)
+    if not rulebook.slug == rulebook_slug:
+        return permanent_redirect_view(request, 'dnd:mobile:spells:spells_in_rulebook',
+                                       kwargs={
+                                           'rulebook_slug': rulebook.slug,
+                                           'rulebook_id': rulebook_id, })
+
+    spell_list = rulebook.spell_set.select_related(
+        'rulebook', 'rulebook__dnd_edition', 'school').all()
+
+    paginator = DndMobilePaginator(spell_list, request)
+
+    return render(request, 'dnd/mobile/spells/spells_in_rulebook.html', context={'rulebook': rulebook,
+      'spell_list': paginator.items(), 'paginator': paginator,
+      'display_3e_warning': is_3e_edition(rulebook.dnd_edition),},)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.SPELLS)
+def spell_detail_mobile(request, rulebook_slug, rulebook_id, spell_slug, spell_id):
+    spell = get_object_or_404(Spell.objects.select_related(
+        'rulebook', 'rulebook__dnd_edition', 'school', 'sub_school').prefetch_related('class_levels'), pk=spell_id)
+
+    if (spell.slug != spell_slug or
+                str(spell.rulebook.id) != rulebook_id or
+                spell.rulebook.slug != rulebook_slug):
+        return permanent_redirect_object_mobile(request, spell)
+
+    spell_class_level_set = spell.spellclasslevel_set.select_related('character_class').prefetch_related('spell__rulebook').all()
+    spell_domain_level_set = spell.spelldomainlevel_set.select_related('domain').all()
+
+    # related spells
+    related_spells = Spell.objects.filter(slug=spell.slug).exclude(rulebook__id=spell.rulebook.id).prefetch_related('rulebook').all()
+
+    # corrupt component -- will be linked to corrupt rule
+    if spell.corrupt_component:
+        corrupt_rule = Rule.objects.filter(slug='corrupt-magic').all()[0]
+    else:
+        corrupt_rule = None
+
+    return render(request, 'dnd/mobile/spells/spell_detail.html', context={'spell': spell,
+      'spellclasslevel_set': spell_class_level_set, 'spelldomainlevel_set': spell_domain_level_set,
+      'corrupt_rule': corrupt_rule, 'rulebook': spell.rulebook,
+      'i_like_it_url': request.build_absolute_uri(), 'inaccurate_url': request.build_absolute_uri(),
+      'display_3e_warning': is_3e_edition(spell.rulebook.dnd_edition), 'related_spells': related_spells,},)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.DESCRIPTORS)
+def spell_descriptor_detail_mobile(request, spell_descriptor_slug):
+    spell_descriptor = get_object_or_404(SpellDescriptor,
+                                         slug=spell_descriptor_slug)
+
+    spell_list = spell_descriptor.spell_set.select_related('rulebook__dnd_edition', 'school').prefetch_related('rulebook').all()
+
+    paginator = DndMobilePaginator(spell_list, request)
+
+    return render(request, 'dnd/mobile/spells/spell_descriptor_detail.html', context=
+      {'spell_descriptor': spell_descriptor, 'spell_list': paginator.items(), 'paginator': paginator,
+       'i_like_it_url': request.build_absolute_uri(), 'inaccurate_url': request.build_absolute_uri(),},)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.SCHOOLS)
+def spell_school_detail_mobile(request, spell_school_slug):
+    spell_school = get_object_or_404(SpellSchool, slug=spell_school_slug)
+
+    spell_list = spell_school.spell_set.select_related('rulebook__dnd_edition', 'school').prefetch_related('rulebook').all()
+
+    paginator = DndMobilePaginator(spell_list, request)
+
+    return render(request, 'dnd/mobile/spells/spell_school_detail.html', context={'spell_school': spell_school,
+      'spell_list': paginator.items(), 'paginator': paginator, 'i_like_it_url': request.build_absolute_uri(),
+      'inaccurate_url': request.build_absolute_uri(), },)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.SCHOOLS)
+def spell_sub_school_detail_mobile(request, spell_sub_school_slug):
+    spell_sub_school = get_object_or_404(SpellSubSchool,
+                                         slug=spell_sub_school_slug)
+
+    spell_list = spell_sub_school.spell_set.select_related('rulebook__dnd_edition', 'school').prefetch_related('rulebook').all()
+
+    paginator = DndMobilePaginator(spell_list, request)
+
+    return render(request, 'dnd/mobile/spells/spell_sub_school_detail.html', context={'spell_sub_school': spell_sub_school,
+      'spell_list': paginator.items(), 'paginator': paginator,
+      'i_like_it_url': request.build_absolute_uri(), 'inaccurate_url': request.build_absolute_uri(), },)
+
+
+@menu_item(MenuItem.MAGIC)
+@submenu_item(MenuItem.Magic.DOMAINS)
+def spell_domain_list_mobile(request):
+    f = SpellDomainFilter(request.GET, queryset=Domain.objects.all())
+
+    paginator = DndMobilePaginator(f.qs, request)
+
+    form_submitted = 1 if '_filter' in request.GET else 0
+
+    return render(request, 'dnd/mobile/spells/spell_domain_list.html', context={'spell_domain_list': paginator.items(),
+      'paginator': paginator, 'filter': f, 'form_submitted': form_submitted,},)
+
+
+@menu_item(MenuItem.Magic.SPELLS)
+@submenu_item(MenuItem.Magic.DOMAINS)
+def spell_domain_detail_mobile(request, spell_domain_slug, rulebook_slug=None, rulebook_id=None):
+    # fetch the class
+    spell_domain = get_object_or_404(Domain.objects.prefetch_related(
+        'variant', 'variant__rulebook'), slug=spell_domain_slug)
+
+    # fetch primary variant, this is independent of rulebook selected
+    try:
+        primary_variant = DomainVariant.objects.select_related('rulebook__dnd_edition',).prefetch_related('rulebook').filter(
+            domain=spell_domain,
+        ).order_by('-rulebook__dnd_edition__core', '-rulebook__published')[0]
+    except Exception:
+        primary_variant = None
+
+    # if rulebook is supplied, select find this variant
+    if rulebook_slug and rulebook_id:
+        # use canonical link in head as this is more or less duplicated content
+        use_canonical_link = True
+        selected_variant = get_object_or_404(
+            DomainVariant.objects.select_related('domain', 'rulebook__dnd_edition').prefetch_related('rulebook'),
+            domain__slug=spell_domain_slug,
+            rulebook__pk=rulebook_id)
+
+        # possible malformed/changed slug
+        if rulebook_slug != selected_variant.rulebook.slug:
+            return permanent_redirect_object_mobile(request, selected_variant)
+
+        # selected variant is primary! Redirect to canonical url
+        if selected_variant == primary_variant:
+            return permanent_redirect_view(
+                request, spell_domain_detail, kwargs={
+                    'spell_domain_slug': spell_domain_slug}
+            )
+    else:
+        # this is canonical, no need to specify it
+        use_canonical_link = False
+        selected_variant = primary_variant
+
+    other_variants = [
+        variant
+        for variant
+        in spell_domain.variant.select_related('rulebook__dnd_edition', 'domain').prefetch_related('rulebook').all()
+        if variant != selected_variant
+    ]
+
+    if selected_variant:
+        display_3e_warning = is_3e_edition(selected_variant.rulebook.dnd_edition)
+    else:
+        display_3e_warning = False
+
+    spell_list = spell_domain.spell_set.select_related('rulebook__dnd_edition', 'school').prefetch_related('rulebook').all()
+
+    paginator = DndMobilePaginator(spell_list, request)
+
+    return render(request, 'dnd/mobile/spells/spell_domain_detail.html', context={'spell_domain': spell_domain,
+      'spell_list': paginator.items(), 'paginator': paginator, 'i_like_it_url': request.build_absolute_uri(),
+      'inaccurate_url': request.build_absolute_uri(), 'selected_variant': selected_variant,
+      'other_variants': other_variants, 'use_canonical_link': use_canonical_link,
+      'display_3e_warning': display_3e_warning, },)
+
+@menu_item(MenuItem.Magic.SPELLS)
+@submenu_item(MenuItem.Magic.SCHOOLS)
+def spell_school_list_mobile(request):
+    spell_school_list = SpellSchool.objects.all()
+    spell_sub_school_list = SpellSubSchool.objects.all()
+    return render(request, 'dnd/mobile/spells/spell_school_list.html', context={'spell_school_list': spell_school_list,
+      'spell_sub_school_list': spell_sub_school_list,},)
+
+
+@menu_item(MenuItem.Magic.SPELLS)
+@submenu_item(MenuItem.Rulebooks.RULEBOOKS)
+def spell_list_by_rulebook_mobile(request):
+    rulebook_list = Rulebook.objects.select_related('dnd_edition').all()
+
+    paginator = DndMobilePaginator(rulebook_list, request)
+
+    return render(request, 'dnd/mobile/spells/spell_list_by_rulebook.html', context={'rulebook_list': paginator.items(),
+      'paginator': paginator,},)
